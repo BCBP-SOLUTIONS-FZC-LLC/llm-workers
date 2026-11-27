@@ -1,0 +1,107 @@
+# Reusable workflow — quality gate.
+# ruff format · ruff lint · mypy --strict · uv.lock drift · architecture rules · pip-audit.
+# Called by ci.yml and release.yml. Does NOT gate coverage (that is validate-test.yml).
+name: Validate / Quality
+
+"on":
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to check out (leave empty to use the caller ref)'
+        type: string
+        required: false
+        default: ''
+    secrets:
+      # Callers pass these explicitly: no `secrets: inherit`, so PR test code never runs with other secrets in scope.
+      CI_REPO_READ_TOKEN:
+        required: false
+      # read-only deploy key for llm-retrieval-generation: the engine is a private git dependency (ssh)
+      GO_PRIVATE_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+          token: ${{ secrets.CI_REPO_READ_TOKEN || github.token }}
+
+      - name: Engine git access
+        # the credential helper reads the token from the environment of the step that fetches (uv sync, the engine
+        # clone); nothing is written to disk and later steps (tests, which run this branch's code) do not get the token
+        run: |
+          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+          git config --global credential.helper "!f() { echo username=x-access-token; echo password=\${GO_PRIVATE_TOKEN}; }; f"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: '0.13.6'
+          python-version: '3.15.2'
+
+      # uv.lock must match pyproject.toml.
+      - name: Lock check
+        run: |
+          if ! make lock-check; then
+            echo "::error file=uv.lock,title=Lock drift::uv.lock is stale for pyproject.toml — run 'make lock' and commit the result."
+            exit 1
+          fi
+
+      - name: Install dependencies (uv sync from uv.lock)
+        env:
+          GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
+        run: uv sync --locked --package llm-workers-generation --group dev
+
+      - name: Verify dependency resolution
+        run: uv pip check
+
+      # Workflow files must use literal operators, not HTML entity encodings.
+      - name: Reject HTML-escaped operators in workflow files
+        run: |
+          if grep -REn '&(gt|lt|amp)' .github/workflows/ .github/scripts/; then
+            echo "::error::Workflow or script files contain HTML entities. Use literal operators instead."
+            exit 1
+          fi
+
+      - name: Format check
+        run: make fmt-check
+
+      - name: Lint
+        run: make lint
+
+      - name: Type check
+        run: make typecheck
+
+      # WD-1..WD-7, WB-1 and the engine's recorded API shape (WB-4).
+      - name: Architecture rules and engine contract
+        run: make arch
+
+      - name: Vulnerability check
+        env:
+          GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
+        run: |
+          if ! make vuln-check; then
+            echo "::error file=pyproject.toml,title=Vulnerability found::pip-audit detected vulnerabilities — run 'make vuln-check' locally to view details."
+            exit 1
+          fi
+
+      # The chart: lint, render dev, staging and prod, validate against the Kubernetes schemas (helm is on the runner).
+      - name: Chart check
+        run: |
+          curl -sSfL -o kubeconform.tgz https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+          echo "9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883  kubeconform.tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin" && tar -xzf kubeconform.tgz -C "$RUNNER_TEMP/bin" kubeconform
+          rm kubeconform.tgz
+          PATH="$RUNNER_TEMP/bin:$PATH" make chart-check

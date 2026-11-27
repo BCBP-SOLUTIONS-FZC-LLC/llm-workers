@@ -1,0 +1,43 @@
+# Scheduled dependency audit: CVEs are published without any commit landing here.
+name: Vulnerability scan
+
+"on":
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Engine git access
+        # the credential helper reads the token from the environment of the step that fetches (uv sync, the engine
+        # clone); nothing is written to disk and later steps (tests, which run this branch's code) do not get the token
+        run: |
+          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+          git config --global credential.helper "!f() { echo username=x-access-token; echo password=\${GO_PRIVATE_TOKEN}; }; f"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: '0.13.6'
+          python-version: '3.15.2'
+
+      - name: Install dependencies (uv sync from uv.lock)
+        env:
+          GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
+        run: uv sync --locked --package llm-workers-generation --group dev
+
+      - name: Vulnerability check
+        env:
+          GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
+        run: make vuln-check
