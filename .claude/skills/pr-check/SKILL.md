@@ -8,5 +8,5 @@ Needs: network for `vuln-check` and for the Temporal test server download (first
 1. `make lock-check fmt-check lint typecheck vuln-check`
 2. `make arch replay` (architecture rules, engine contract, recorded histories replay)
 3. `make cover-check` (the whole suite, 95% coverage gate)
-4. If the diff touches `deploy/Dockerfile` or the engine pin: `make trivy` (needs Docker and GO_PRIVATE_TOKEN or `gh auth login`).
+4. If the diff touches `Dockerfile` or the engine pin: `make trivy` (needs Docker and GO_PRIVATE_TOKEN or `gh auth login`).
 Do not edit `generation/tests/contract/engine_api_v1.json` to make a contract test pass: a moved engine shape needs a deliberate pin bump. Finish with a short verdict: ready for a PR, or what blocks it.

@@ -12,7 +12,7 @@ Records are records. The LLD revision-history rows (§23), answers in §20.2, da
 2. **Claims the diff makes wrong.** For every behaviour, default, name, path or order the diff changes in code, search the documents for the old wording (README, ARCHITECTURE.md, CONTRIBUTING, VERSIONING, `docs/**`, `.env-example`, `.claude/**`, docstrings in `generation/src/`) and report each place still describing the old behaviour. A change to a rule's status must also change its row in `docs/lld-traceability.md`.
 3. **One fact, one answer.** Facts stated in several places must agree.
 - Release status: the CHANGELOG says no version has been released or deployed and everything lives under `[Unreleased]`. README, VERSIONING and `.claude/CLAUDE.md` must say the same.
-- Python version: `requires-python` in both `pyproject.toml` files, `deploy/Dockerfile`, CI (`python-version`), `make setup`, README and `.claude/CLAUDE.md`.
+- Python version: `requires-python` in both `pyproject.toml` files, `Dockerfile`, CI (`python-version`), `make setup`, README and `.claude/CLAUDE.md`.
 - The engine pin: `[tool.uv.sources]` in `generation/pyproject.toml` against VERSIONING, ADR-0003, ADR-0006 and CONTRIBUTING (today the annotated tag `engine-v1.1.0`, locked at `b6b92e6`; never the orphaned `3b93dac`).
 - The LLD revision and open-item counts: the header, the end-of-document line and every "rev 0.x" or "n open items" reference elsewhere.
 - Coverage gate: `.github/scripts/coverage-gate.sh` against README, CONTRIBUTING, VERSIONING and `.claude/*`.

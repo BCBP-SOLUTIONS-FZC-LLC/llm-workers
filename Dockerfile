@@ -2,7 +2,7 @@
 # Digests are the ones llm-retrieval-generation pins (the worker imports the engine, so the Python must match: LLD §3.5).
 # Build (the engine is a private git dependency, fetched over https with a token passed as a BuildKit
 # secret and never baked into a layer; CI passes GO_PRIVATE_TOKEN, `make docker-build` uses it or `gh auth token`):
-#   docker build --secret id=gh_token,env=GO_PRIVATE_TOKEN -f deploy/Dockerfile -t llm-workers-generation:dev .
+#   docker build --secret id=gh_token,env=GO_PRIVATE_TOKEN -f Dockerfile -t llm-workers-generation:dev .
 FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
 
 FROM python:3.15.2-slim-bookworm@sha256:4e03260adeeebafccd084f3584e6b84823aba5651cfb53ef8a078ed441ddf9cd AS builder
@@ -17,7 +17,7 @@ COPY generation/src generation/src
 # --no-editable: the runtime stage copies only the venv, so the package must be installed into it
 RUN --mount=type=secret,id=gh_token \
     git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" \
-    && git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(cat /run/secrets/gh_token)"; }; f' \
+    && git config --global credential.helper "!f() { echo username=x-access-token; echo password=\$(cat /run/secrets/gh_token); }; f" \
     && uv sync --frozen --no-dev --no-editable --package llm-workers-generation \
     && git config --global --unset-all credential.helper
 

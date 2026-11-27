@@ -104,7 +104,7 @@ jobs:
       - name: Hadolint
         uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
         with:
-          dockerfile: deploy/Dockerfile
+          dockerfile: Dockerfile
           ignore: DL3008
 
       - name: Check .dockerignore exists
@@ -134,7 +134,7 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: deploy/Dockerfile
+          file: Dockerfile
           secrets: |
             gh_token=${{ secrets.GO_PRIVATE_TOKEN }}
           platforms: linux/amd64
@@ -175,7 +175,7 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: deploy/Dockerfile
+          file: Dockerfile
           load: true
           push: false
           tags: llm-workers-generation:ci
@@ -263,7 +263,7 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: deploy/Dockerfile
+          file: Dockerfile
           load: true
           push: false
           tags: llm-workers-generation:ci
@@ -357,7 +357,7 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: deploy/Dockerfile
+          file: Dockerfile
           secrets: |
             gh_token=${{ secrets.GO_PRIVATE_TOKEN }}
           platforms: linux/amd64

@@ -51,7 +51,8 @@ generation/                      this deployment: generation and extraction work
     operator/                    audited operator commands
     tuning.py, errors.py, types.py, config.py
   tests/
-deploy/                          Dockerfile, helm/ (one Deployment per queue)
+Dockerfile                       the service image (repository root)
+deploy/                          helm/ (one Deployment per queue)
 docs/                            LLD, ADRs, module map, traceability
 ```
 
@@ -180,7 +181,7 @@ Unit, workflow (Temporal time-skipping), replay, security (a canary string must 
 
 ## Deployment
 
-A Dockerfile (`deploy/Dockerfile`), a Helm chart (`deploy/helm/llm-workers`: one Deployment per queue, KEDA scaler on task-queue backlog, PDB, network policy) and CI/release workflows exist. The chart has been rendered and linted (`helm`), nothing else has run: the image is not built, the workflows have never run on GitHub and nothing was applied to a cluster. Pods spread across zones and drain within `WORKER_SHUTDOWN_GRACE_SECONDS`. See [`VERSIONING.md`](VERSIONING.md#planned-not-yet-in-place) for what is planned.
+A `Dockerfile` (repository root), a Helm chart (`deploy/helm/llm-workers`: one Deployment per queue, KEDA scaler on task-queue backlog, PDB, network policy) and CI/release workflows exist. The chart has been rendered and linted (`helm`), nothing else has run: the image is not built, the workflows have never run on GitHub and nothing was applied to a cluster. Pods spread across zones and drain within `WORKER_SHUTDOWN_GRACE_SECONDS`. See [`VERSIONING.md`](VERSIONING.md#planned-not-yet-in-place) for what is planned.
 
 ## Not built
 

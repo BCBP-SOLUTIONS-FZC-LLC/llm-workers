@@ -13,7 +13,8 @@ extraction, with LangGraph section graphs, quota-aware pause and resume, and ten
 ```
 generation/src/llm_workers_generation/   workflows, activities, graphs, codec, observability, versioning, operator
 generation/tests/                         unit, workflow (time-skipping), replay, security, integration, contract
-deploy/                                   Dockerfile and the Helm chart (one Deployment per queue)
+Dockerfile                                the service image
+deploy/                                   the Helm chart (one Deployment per queue)
 ```
 
 No API routes live here. The API service starts and signals workflows; every read and write goes through

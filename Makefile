@@ -195,7 +195,7 @@ build:
 # BuildKit secret: GO_PRIVATE_TOKEN (the secret name the IAM repo uses), else your `gh auth token`.
 .PHONY: docker-build
 docker-build:
-	GO_PRIVATE_TOKEN="$${GO_PRIVATE_TOKEN:-$$(gh auth token)}" docker build --secret id=gh_token,env=GO_PRIVATE_TOKEN --build-arg BUILD_VERSION=$(BUILD_VERSION) -f deploy/Dockerfile -t $(IMAGE) .
+	GO_PRIVATE_TOKEN="$${GO_PRIVATE_TOKEN:-$$(gh auth token)}" docker build --secret id=gh_token,env=GO_PRIVATE_TOKEN --build-arg BUILD_VERSION=$(BUILD_VERSION) -f Dockerfile -t $(IMAGE) .
 
 # trivy: the release.yml CVE gate, locally. Scans the image docker-build just made for CRITICAL/HIGH
 # findings that have a fix; exits non-zero on any. Uses a local trivy if installed, else the

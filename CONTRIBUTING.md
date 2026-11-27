@@ -184,7 +184,7 @@ test(security): add a canary case for a failure raised inside the section graph
 
 ## Deployment
 
-**Partly planned.** A `Dockerfile` exists (`deploy/Dockerfile`; `make docker-build`), a Helm chart exists in `deploy/helm/llm-workers/` (one Deployment per queue, KEDA scaler, PDB, network policy; rendered and linted, never applied to a cluster), and `.github/workflows/release.yml` builds, scans, smoke-tests, pushes and signs the image on a version tag (never run; no tag exists). CI validates and builds; it publishes an image only on a push to `main`, and nothing deploys it.
+**Partly planned.** A `Dockerfile` exists (repository root; `make docker-build`), a Helm chart exists in `deploy/helm/llm-workers/` (one Deployment per queue, KEDA scaler, PDB, network policy; rendered and linted, never applied to a cluster), and `.github/workflows/release.yml` builds, scans, smoke-tests, pushes and signs the image on a version tag (never run; no tag exists). CI validates and builds; it publishes an image only on a push to `main`, and nothing deploys it.
 
 **On push to `main` and on pull requests** (`.github/workflows/ci.yml`, skipped for Markdown-only changes):
 
