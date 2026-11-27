@@ -477,7 +477,10 @@ def _conflicts(api: EngineApi, raw: str, ordered: list[str], keys: set[str]) -> 
         if not isinstance(stated, dict):
             continue
         for key in keys & set(stated):
-            value = str(stated[key]).strip()
+            raw = stated[key]
+            if not isinstance(raw, str | int | float) or len(str(raw)) > MAX_FACT_VALUE_CHARS:
+                continue  # the same bounds as a captured fact: a value, not prose or a structure
+            value = str(raw).strip()
             if key not in established:
                 established[key] = (value, sid)
             elif value.casefold() != established[key][0].casefold():

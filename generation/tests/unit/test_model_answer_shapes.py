@@ -69,3 +69,10 @@ def test_deeply_nested_output_is_a_schema_violation_not_a_retried_crash() -> Non
 def test_a_fact_value_that_is_prose_sized_is_dropped() -> None:
     long = {"key": "contract_value", "section": SECTION, "value": "x" * 5000}
     assert facts({"facts": [long]}) == []
+
+
+def test_conflicts_ignore_a_value_that_is_a_structure_or_prose_sized() -> None:
+    a, b = str(uuid4()), str(uuid4())
+    for odd in ({"x": 1}, ["y"], "z" * 5000):
+        raw = json.dumps({"values": {a: {"contract_value": "1"}, b: {"contract_value": odd}}})
+        assert _conflicts(API, raw, [a, b], {"contract_value"}) == []
