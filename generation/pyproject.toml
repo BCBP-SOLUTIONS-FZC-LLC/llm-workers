@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llm-workers-generation"
+version = "0.1.0"
+description = "Generation and extraction workers: Temporal workflows, activities and the LangGraph section graph"
+requires-python = ">=3.15"
+dependencies = [
+    # the engine (rag.engine 1.1.0) and the plain types (llm_models.workers) ship in one wheel (H-6)
+    "retrieval-generation",
+    # logs and traces go through it (WD-5); same range as the engine's own pin
+    "platform-fastapicommon>=0.6.0,<0.7",
+    # the ops server (health and metrics routers): same ranges as the engine, whose pins the lock uses
+    "fastapi>=0.115.10",
+    "uvicorn>=0.29",
+    "temporalio>=1.37,<2",
+    "langgraph>=1.2,<2",
+    "pydantic>=2.9,<3",
+    "pydantic-settings>=2.2",
+    "cryptography>=44",
+    "opentelemetry-api>=1.27",
+    "opentelemetry-sdk>=1.27",
+]
+
+[tool.uv.sources]
+# H-8: by git tag. engine-v1.1.0 is an annotated tag (tag object 047d834) that peels to b6b92e6,
+# the squash merge on the engine's main. Never pin 3b93dac: it is the branch commit the squash merge
+# orphans. The scheduled engine-bump PR (LLD §4.6) keeps the tag current.
+retrieval-generation = { git = "ssh://git@github.com/BCBP-SOLUTIONS-FZC-LLC/llm-retrieval-generation.git", tag = "engine-v1.1.0" }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "pytest-timeout>=2.3",
+    "mypy>=1.11",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+llm-workers-generation = "llm_workers_generation.worker:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/llm_workers_generation"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+timeout = 120
+pythonpath = ["src", "tests"]
+addopts = "-m 'not integration' --cov=llm_workers_generation --cov-report=term-missing"
+markers = ["integration: needs the Temporal test server (downloaded on first use)"]

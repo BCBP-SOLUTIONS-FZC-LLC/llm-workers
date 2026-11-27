@@ -1,0 +1,11 @@
+# Local infrastructure for llm-workers (docker compose up -d): a Temporal dev server and nothing else.
+#
+# The database, caches and model stub the engine needs are NOT here. They come from the
+# llm-retrieval-generation repository: `make docker-up` and `make gateway-up` there.
+services:
+  temporal:
+    image: temporalio/temporal:1.5.1
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--port", "7233", "--ui-port", "8233"]
+    ports:
+      - "7233:7233"   # frontend gRPC: TEMPORAL_ADDRESS=localhost:7233
+      - "8233:8233"   # web UI

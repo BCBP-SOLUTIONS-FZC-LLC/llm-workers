@@ -1,0 +1,48 @@
+[project]
+name = "llm-workers"
+version = "0.1.0"
+description = "Worker Pool of the LLM subsystem (LLD: docs/lld/llm-lld-workers-service.md)"
+requires-python = ">=3.15"
+
+# uv workspace root (LLD §3.2): one member per deployment. `ingestion/` joins later (D-4, I-1).
+[tool.uv.workspace]
+members = ["generation"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py315"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "D", "ANN", "ASYNC"]
+ignore = ["D105", "D107", "D203", "D213", "D401", "ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"generation/src/llm_workers_generation/activities/ports.py" = ["D102"]  # Protocol members: documented on the class
+"generation/tests/**" = ["D", "ANN", "E501", "ASYNC", "B", "S", "SLF"]
+"generation/real_engine/**" = ["D", "ANN", "E501", "ASYNC", "B", "S", "SLF", "BLE", "S603", "S607"]
+
+[tool.mypy]
+strict = true
+python_version = "3.15"
+mypy_path = "generation/src"
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+# the engine wheel is installed in CI; locally it may be absent (it needs Python 3.15)
+module = ["rag.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# the adapter over the engine: return types are only as good as the installed engine's
+module = ["llm_workers_generation.activities.engine_api"]
+warn_return_any = false
+
+[[tool.mypy.overrides]]
+# the engine wheel ships llm_models without py.typed
+module = ["llm_models.*"]
+follow_untyped_imports = true
+
+[[tool.mypy.overrides]]
+# platform-fastapicommon ships no py.typed marker; its source is fully annotated (same as llm-retrieval-generation).
+module = ["fastapicommon", "fastapicommon.*"]
+follow_untyped_imports = true
