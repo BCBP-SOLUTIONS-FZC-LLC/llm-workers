@@ -1,0 +1,96 @@
+{{- /* One Deployment per work queue (LLD §17.1). A pod polls <queue> and <queue>-control (§12.3). */ -}}
+{{- range .Values.queues }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-workers-{{ .name }}
+  namespace: {{ $.Values.namespace }}
+  labels: { app.kubernetes.io/name: llm-workers, llm.bcbp/queue: {{ .name }}, llm.bcbp/tier: {{ .tier }} }
+spec:
+  replicas: {{ .minReplicas }}
+  selector:
+    matchLabels: { app.kubernetes.io/name: llm-workers, llm.bcbp/queue: {{ .name }} }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: llm-workers, llm.bcbp/queue: {{ .name }}, llm.bcbp/tier: {{ .tier }} }
+      # No prometheus.io/* annotations: they take one port and the pod has two scrape endpoints
+      # (ops 8080 and the Temporal runtime 9464). monitoring.yaml scrapes both with a PodMonitor.
+    spec:
+      serviceAccountName: {{ $.Values.serviceAccount.name }}
+      terminationGracePeriodSeconds: {{ add $.Values.worker.shutdownGraceSeconds $.Values.worker.terminationMarginSeconds }}
+      topologySpreadConstraints:                 # spread across zones (§17.3)
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { llm.bcbp/queue: {{ .name }} } }
+      automountServiceAccountToken: false   # the pod calls no Kubernetes API (IRSA injects its own token)
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: worker
+          image: "{{ $.Values.image.repository }}:{{ required "image.tag is required" $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          ports:
+            - { name: ops, containerPort: 8080 }          # /health /live /ready /metrics (fastapicommon)
+            - { name: sdk-metrics, containerPort: 9464 }  # /metrics: Temporal SDK telemetry + workflow-side metrics
+          env:
+            # settings from values first: the fixed entries below come last and win on a duplicate name
+            {{- range $k, $v := $.Values.env }}
+            - { name: {{ $k }}, value: {{ $v | quote }} }
+            {{- end }}
+            # kind and tier select the queue and the Worker Deployment name; neither is configured by name (§16)
+            - { name: WORKER_KIND, value: {{ .kind | quote }} }
+            - { name: WORKER_TIER, value: {{ .tier | quote }} }
+            - { name: BUILD_ID, value: {{ $.Values.image.tag | quote }} }
+            - { name: TEMPORAL_ADDRESS, value: {{ required "temporal.address is required" $.Values.temporal.address | quote }} }
+            - { name: TEMPORAL_NAMESPACE, value: {{ required "temporal.namespace is required" $.Values.temporal.namespace | quote }} }
+            - { name: TEMPORAL_TLS_CERT_PATH, value: /var/run/temporal-tls/tls.crt }
+            - { name: TEMPORAL_TLS_KEY_PATH, value: /var/run/temporal-tls/tls.key }
+            - { name: MAX_CONCURRENT_ACTIVITIES, value: {{ $.Values.worker.maxConcurrentActivities | quote }} }
+            - { name: MAX_CONCURRENT_CONTROL_ACTIVITIES, value: {{ $.Values.worker.maxConcurrentControlActivities | quote }} }
+            - { name: MAX_CONCURRENT_WORKFLOW_TASKS, value: {{ $.Values.worker.maxConcurrentWorkflowTasks | quote }} }
+            - { name: MAX_REPLICAS, value: {{ .maxReplicas | quote }} }
+            - { name: PAYLOAD_CODEC_KEY_ID, value: {{ required "codecKey.keyId is required" $.Values.codecKey.keyId | quote }} }
+            - { name: PAYLOAD_CODEC_KEY_PATH, value: {{ printf "/var/run/codec/%s" $.Values.codecKey.keyId | quote }} }
+            - { name: WORKER_SHUTDOWN_GRACE_SECONDS, value: {{ $.Values.worker.shutdownGraceSeconds | quote }} }
+          envFrom:
+            - secretRef: { name: {{ $.Values.secretName }} }
+          livenessProbe:  { httpGet: { path: /live, port: ops }, periodSeconds: 10, failureThreshold: 3 }
+          readinessProbe: { httpGet: { path: /ready, port: ops }, periodSeconds: 5 }
+          resources: {{- toYaml $.Values.worker.resources | nindent 12 }}
+          volumeMounts:
+            - { name: temporal-tls, mountPath: /var/run/temporal-tls, readOnly: true }
+            - { name: codec-key, mountPath: /var/run/codec, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: temporal-tls, secret: { secretName: {{ $.Values.temporal.tlsSecretName }} } }
+        - { name: codec-key, secret: { secretName: {{ $.Values.codecKey.secretName }} } }
+        - { name: tmp, emptyDir: {} }
+{{- if ge (int .minReplicas) 2 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget            # at least one pod per queue during a drain (§17.3); none for a single replica: it would block every drain
+metadata: { name: llm-workers-{{ .name }}, namespace: {{ $.Values.namespace }} }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app.kubernetes.io/name: llm-workers, llm.bcbp/queue: {{ .name }} } }
+{{- end }}
+{{- if $.Values.autoscaling.enabled }}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject                   # scale on task-queue backlog, one pod per N queued activities (§17.2)
+metadata: { name: llm-workers-{{ .name }}, namespace: {{ $.Values.namespace }} }
+spec:
+  scaleTargetRef: { name: llm-workers-{{ .name }} }
+  minReplicaCount: {{ .minReplicas }}
+  maxReplicaCount: {{ .maxReplicas }}   # x maxConcurrentActivities = the fleet cap (§12.2)
+  triggers:
+    - type: external
+      metadata:
+        scalerAddress: {{ required "autoscaling.kedaTemporalScaler is required when autoscaling.enabled" $.Values.autoscaling.kedaTemporalScaler | quote }}
+        namespace: {{ $.Values.temporal.namespace | quote }}
+        taskQueue: {{ .name | quote }}
+        targetQueueSize: {{ $.Values.autoscaling.queuedActivitiesPerPod | quote }}
+{{- end }}
+{{- end }}

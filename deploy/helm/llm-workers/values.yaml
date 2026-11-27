@@ -1,0 +1,71 @@
+# Defaults are the LLD's starting values (§12.3, §16, §17). Secrets never appear here: they come
+# from the platform secret store through `secretName` (LLD §14.3).
+image:
+  repository: ghcr.io/bcbp-solutions-fzc-llc/llm-workers-generation
+  tag: ""            # the image tag is also the Worker Deployment build id (WV-5)
+  pullPolicy: IfNotPresent
+
+namespace: llm-workers
+serviceAccount:
+  name: llm-workers
+  irsaRoleArn: ""    # PL-2 (open): s3:PutObject on tenants/*, kms:Encrypt with the tenant_id context, the codec key
+
+temporal:
+  address: ""        # required
+  namespace: ""      # required outside local, dev and test (PL-9: llm-generation-<env>)
+  tlsSecretName: llm-workers-temporal-tls   # tls.crt and tls.key, mounted (WE-3, PL-7)
+
+secretName: llm-workers-secrets   # GENERATION_DATABASE_URL, CORPUS_DATABASE_URL (PL-1, PL-2)
+
+# The payload codec key (LLD §14.2): 32 raw bytes in a file. The secret holds one entry named like the
+# key id; it is mounted at /var/run/codec and PAYLOAD_CODEC_KEY_PATH points at it. Required: the worker
+# refuses to start outside local, dev and test without it.
+codecKey:
+  secretName: llm-workers-codec-key
+  keyId: ""          # required, for example k1
+
+env:                 # non-secret settings, passed through as-is
+  APP_ENV: prod
+  OBSERVABILITY_DOMAIN: llm
+  ENABLE_METRICS: "true"
+  PG_BOUNCER_MODE: "true"
+
+# One Deployment per queue (§17.1). minReplicas: 2 on the standard queues, 1 on the dedicated tiers (§12.3).
+# maxReplicas x maxConcurrentActivities is the fleet cap that bounds sections globally (§12.2).
+queues:
+  - { name: llm-generation,            kind: generation, tier: standard,   minReplicas: 2, maxReplicas: 12 }
+  - { name: llm-generation-enterprise, kind: generation, tier: enterprise, minReplicas: 1, maxReplicas: 6 }
+  - { name: llm-generation-strict,     kind: generation, tier: strict,     minReplicas: 1, maxReplicas: 4 }
+  - { name: llm-extraction,            kind: extraction, tier: standard,   minReplicas: 2, maxReplicas: 8 }
+  - { name: llm-extraction-enterprise, kind: extraction, tier: enterprise, minReplicas: 1, maxReplicas: 4 }
+  - { name: llm-extraction-strict,     kind: extraction, tier: strict,     minReplicas: 1, maxReplicas: 4 }
+
+podMonitor:
+  enabled: false     # needs the Prometheus Operator CRDs (PodMonitor); turn on per environment, so a first install
+                     # on a cluster without them does not fail
+  interval: 30s
+
+alerts:
+  enabled: false     # PrometheusRule for the section 15.4 alerts the workers' metrics can express; needs the Operator CRDs
+
+worker:
+  maxConcurrentActivities: 8
+  maxConcurrentControlActivities: 16
+  maxConcurrentWorkflowTasks: 32
+  shutdownGraceSeconds: 600      # = the section activity's start-to-close (§13.5)
+  terminationMarginSeconds: 60
+  resources:
+    requests: { cpu: "2", memory: 2Gi }
+    limits: { memory: 2Gi }
+
+autoscaling:
+  enabled: false                  # on in staging and prod (values-<env>.yaml); the chart refuses to render it on with no scaler
+  kedaTemporalScaler: ""          # required when enabled: address of the Temporal task-queue backlog scaler (the platform's)
+  queuedActivitiesPerPod: 8       # the HLD's scaling signal (§12.3, §17.2)
+
+networkPolicy:
+  # Empty means allow all egress and ingress on the two ports: the platform has not named the labels of
+  # its services (PL-3). Set these in each environment's values to narrow them (standard NetworkPolicy rules).
+  egress: []
+  ingressFrom: []
+  egressTo: [temporal, pgbouncer, valkey, qdrant, s3, gateway, iam, tender, llm-context]

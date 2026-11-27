@@ -221,3 +221,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# llm-workers: release and scan artefacts written by CI and make targets
+trivy-results.sarif
+sbom.cyclonedx.json
+provenance.slsa.json
+release-notes.md
+release-notes.md.tmp
+.cache/

@@ -1,0 +1,22 @@
+# Default: every file requires review from the LLM team.
+* @BCBP-SOLUTIONS-FZC-LLC/llm-team
+
+# Workflow and release automation changes require explicit sign-off.
+.github/workflows/ @BCBP-SOLUTIONS-FZC-LLC/llm-team
+
+# Workflow code is replayed against live histories: a change to the commands it issues needs a patch marker.
+generation/src/llm_workers_generation/workflows/ @BCBP-SOLUTIONS-FZC-LLC/llm-team
+generation/src/llm_workers_generation/versioning/ @BCBP-SOLUTIONS-FZC-LLC/llm-team
+
+# Anything between this service and Temporal history: no readable content may cross it.
+generation/src/llm_workers_generation/codec/ @BCBP-SOLUTIONS-FZC-LLC/llm-team
+generation/src/llm_workers_generation/activities/_guard.py @BCBP-SOLUTIONS-FZC-LLC/llm-team
+generation/src/llm_workers_generation/types.py @BCBP-SOLUTIONS-FZC-LLC/llm-team
+
+# The one module that imports the engine, and the engine pin.
+generation/src/llm_workers_generation/activities/engine_api.py @BCBP-SOLUTIONS-FZC-LLC/llm-team
+generation/pyproject.toml @BCBP-SOLUTIONS-FZC-LLC/llm-team
+uv.lock @BCBP-SOLUTIONS-FZC-LLC/llm-team
+
+# Deployment: queues, scaling, identity and network policy.
+deploy/ @BCBP-SOLUTIONS-FZC-LLC/llm-team

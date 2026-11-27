@@ -1,0 +1,14 @@
+# staging. What this repository decides. The platform supplies the rest at install time:
+#   --set image.tag=<build id>  --set temporal.address=<frontend host:port>  --set codecKey.keyId=<key id>
+#   (and, where autoscaling is on, --set autoscaling.kedaTemporalScaler=<scaler address>)
+# The Temporal namespace follows our proposed pattern llm-generation-<env>; the cluster operator's pattern
+# is still open (PL-9), so change it here when they answer.
+temporal:
+  namespace: llm-generation-staging
+env:
+  APP_ENV: staging
+  OBSERVABILITY_DOMAIN: llm
+  ENABLE_METRICS: "true"
+  PG_BOUNCER_MODE: "true"
+autoscaling:
+  enabled: true
