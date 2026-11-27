@@ -1,0 +1,7 @@
+# CVE-2026-18140: aws-smithy-json 0.62.3 (fixed in 0.62.7), a Rust crate in temporalio's native core.
+# It is reported from the Cargo.lock shipped inside the temporalio wheel (sdk-core), not from anything this
+# service installs: temporalio 1.37.0 is the newest release on PyPI (checked 2026-11-27) and the crate is
+# compiled into the wheel, so this repository cannot patch it. Not checked: whether the core ever parses
+# untrusted JSON with it. The expiry forces a re-check: bump temporalio, drop this entry, once a release
+# locks aws-smithy-json >= 0.62.7.
+CVE-2026-18140 exp:2026-12-31
