@@ -1,0 +1,52 @@
+{{- /* Two scrape endpoints per pod, both /metrics (ADR-0006, scrape options A/B/C). Needs the
+Prometheus Operator CRDs; set podMonitor.enabled=false where they are absent. */ -}}
+{{- if .Values.podMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: llm-workers
+  namespace: {{ .Values.namespace }}
+  labels: { app.kubernetes.io/name: llm-workers }
+spec:
+  selector:
+    matchLabels: { app.kubernetes.io/name: llm-workers }
+  podMetricsEndpoints:
+    - { port: ops, path: /metrics, interval: {{ .Values.podMonitor.interval | quote }} }          # fastapicommon: activity-side metrics
+    - { port: sdk-metrics, path: /metrics, interval: {{ .Values.podMonitor.interval | quote }} }  # Temporal SDK + workflow-side metrics
+{{- end }}
+{{- /* Alert rules for the LLD's section 15.4 alerts that the workers' own metrics can express. Needs the
+Prometheus Operator CRDs; off by default. The metric names are the ones the real scrape shows
+(make metrics-lint). The rest of the section 15.4 list is not here, with the reason in docs/runbooks/README.md. */ -}}
+{{- if .Values.alerts.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: llm-workers
+  namespace: {{ .Values.namespace }}
+  labels: { app.kubernetes.io/name: llm-workers }
+spec:
+  groups:
+    - name: llm-workers
+      rules:
+        - alert: LlmWorkersUnrecordedFailure
+          expr: increase(llm_workers_unrecorded_failures_total[5m]) > 0
+          labels: { severity: page }
+          annotations: { summary: "A run could not record its own ending", runbook: "docs/runbooks/unrecorded-failure.md" }
+        - alert: LlmWorkersRunDeadline
+          expr: increase(llm_workers_run_deadline_total[5m]) > 0
+          labels: { severity: page }
+          annotations: { summary: "A run was failed by the run deadline", runbook: "docs/runbooks/quiet-async-run.md" }
+        - alert: LlmWorkersPoisonBreaker
+          expr: increase(llm_workers_poison_breaker_total[10m]) > 0
+          labels: { severity: ticket }
+          annotations: { summary: "A document was stopped: most of its sections failed with one error", runbook: "docs/runbooks/poison-section-breaker.md" }
+        - alert: LlmWorkersLostSignals
+          expr: increase(llm_workers_reconcile_recovered_total[1h]) > 0
+          labels: { severity: ticket }
+          annotations: { summary: "A wait recovered from the row: the API's signal path is failing", runbook: "docs/runbooks/lost-signal.md" }
+        - alert: LlmWorkersRestartLoop
+          expr: increase(kube_pod_container_status_restarts_total{namespace={{ .Values.namespace | quote }}, pod=~"llm-workers-.*"}[15m]) > 3
+          labels: { severity: page }
+          annotations: { summary: "A worker pod is restarting repeatedly", runbook: "docs/runbooks/worker-rollback.md" }
+{{- end }}

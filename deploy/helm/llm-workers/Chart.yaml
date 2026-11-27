@@ -1,0 +1,6 @@
+apiVersion: v2
+name: llm-workers
+description: "Worker Pool of the LLM subsystem, one Deployment per Temporal task queue (LLD §17)"
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
